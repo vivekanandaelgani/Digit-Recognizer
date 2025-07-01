@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Digit Recognizer</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: white;
+      color: black;
+      font-family: sans-serif;
+    }
+
+    .container {
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    .controls {
+      margin-bottom: 8px;
+    }
+
+    canvas {
+      border: 1px solid black;
+      background-color: black;
+      touch-action: none;
+      cursor: crosshair;
+      display: block;
+      margin: 0 auto;
+    }
+
+    button {
+      margin: 0 4px;
+      padding: 8px 18px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      color: white;
+    }
+
+    #clear-btn {
+      background-color: #d9534f;
+    }
+
+    #upload-btn {
+      background-color: #5cb85c;
+    }
+
+    #output {
+      font-size: 10px;
+      margin-top: 8px;
+      color: black;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Digit Recognizer</h1>
+    <div class="controls">
+      <button id="clear-btn" onclick="clearCanvas()">Clear</button>
+      <button id="upload-btn" onclick="upload()">Upload</button>
+    </div>
+
+    <canvas id="canvas" width="200" height="200"></canvas>
+    <p id="output">Scribble a digit and press upload.</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Set initial canvas background to black
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Brush settings
+    ctx.lineWidth = 15;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = "white";
+
+    let drawing = false;
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function startDrawing(e) {
+      drawing = true;
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+
+    function stopDrawing() {
+      drawing = false;
+      ctx.beginPath();
+    }
+
+    function draw(e) {
+      if (!drawing) return;
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('touchstart', (e) => { startDrawing(e); e.preventDefault(); });
+    canvas.addEventListener('touchend', (e) => { stopDrawing(); e.preventDefault(); });
+    canvas.addEventListener('touchmove', (e) => { draw(e); e.preventDefault(); });
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.beginPath();
+      document.getElementById('output').innerText = 'Scribble a digit and press upload.';
+    }
+
+    function upload() {
+      const dataURL = canvas.toDataURL('image/png');
+      fetch('/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(dataURL)
+      })
+      .then(response => response.json())
+      .then(result => {
+        if (result.success) {
+          document.getElementById("output").innerHTML =
+            "<strong>Recognized Digit</strong>: " + result.class +
+            "<br><strong>Confidence</strong>: " + (result.confidence * 100).toFixed(2) + "%";
+        } else {
+          document.getElementById("output").innerText = "Error: " + (result.error || "Unknown error.");
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("output").innerText = "Prediction failed.";
+      });
+    }
+  </script>
+</body>
+</html>
